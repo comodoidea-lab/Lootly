@@ -25,7 +25,7 @@ export default function Home() {
     return new Promise((resolve) => {
       const img = new Image();
       img.onload = () => {
-        const MAX = 1920;
+        const MAX = 1024;
         let { width, height } = img;
         if (width > MAX || height > MAX) {
           if (width > height) { height = Math.round((height * MAX) / width); width = MAX; }
@@ -35,7 +35,7 @@ export default function Home() {
         canvas.width = width;
         canvas.height = height;
         canvas.getContext("2d")!.drawImage(img, 0, 0, width, height);
-        const compressed = canvas.toDataURL("image/jpeg", 0.85);
+        const compressed = canvas.toDataURL("image/jpeg", 0.75);
         resolve({ base64: compressed.split(",")[1], mimeType: "image/jpeg", preview: compressed });
       };
       img.src = dataUrl;
@@ -109,7 +109,10 @@ export default function Home() {
           fields,
         }),
       });
-      const data = await res.json();
+      if (res.status === 413) throw new Error("画像が大きすぎます。別の画像をお試しください");
+      const text = await res.text();
+      let data: { result?: string; error?: string };
+      try { data = JSON.parse(text); } catch { throw new Error(`サーバーエラー (${res.status})`); }
       if (!res.ok) throw new Error(data.error || "エラーが発生しました");
       setResult(data.result);
       setStatus("success");
