@@ -114,7 +114,7 @@ export default function Home() {
       let data: { result?: string; error?: string };
       try { data = JSON.parse(text); } catch { throw new Error(`サーバーエラー (${res.status})`); }
       if (!res.ok) throw new Error(data.error || "エラーが発生しました");
-      setResult(data.result);
+      setResult(data.result ?? "");
       setStatus("success");
     } catch (err) {
       setError(err instanceof Error ? err.message : "エラーが発生しました");
