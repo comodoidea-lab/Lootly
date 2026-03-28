@@ -21,20 +21,37 @@ export default function Home() {
     }
   }, []);
 
+  const compressImage = (dataUrl: string): Promise<{ base64: string; mimeType: string; preview: string }> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const MAX = 1920;
+        let { width, height } = img;
+        if (width > MAX || height > MAX) {
+          if (width > height) { height = Math.round((height * MAX) / width); width = MAX; }
+          else { width = Math.round((width * MAX) / height); height = MAX; }
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext("2d")!.drawImage(img, 0, 0, width, height);
+        const compressed = canvas.toDataURL("image/jpeg", 0.85);
+        resolve({ base64: compressed.split(",")[1], mimeType: "image/jpeg", preview: compressed });
+      };
+      img.src = dataUrl;
+    });
+  };
+
   const processFiles = useCallback((files: FileList | File[]) => {
     const imageFiles = Array.from(files).filter((f) => f.type.startsWith("image/"));
     imageFiles.forEach((file) => {
       const reader = new FileReader();
-      reader.onload = (e) => {
+      reader.onload = async (e) => {
         const dataUrl = e.target?.result as string;
+        const { base64, mimeType, preview } = await compressImage(dataUrl);
         setImages((prev) => [
           ...prev,
-          {
-            id: `${Date.now()}-${Math.random()}`,
-            base64: dataUrl.split(",")[1],
-            mimeType: file.type,
-            preview: dataUrl,
-          },
+          { id: `${Date.now()}-${Math.random()}`, base64, mimeType, preview },
         ]);
         setResult("");
         setStatus("idle");
