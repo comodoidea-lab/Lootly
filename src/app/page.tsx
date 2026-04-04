@@ -5,9 +5,36 @@ import { useEffect, useRef, useState, useCallback } from "react";
 type ImageItem = { id: string; base64: string; mimeType: string; preview: string };
 type Status = "idle" | "loading" | "success" | "error";
 
+const FIELDS_HISTORY_KEY = "lootly-fields-history";
+const MAX_FIELDS_HISTORY = 4;
+
+function readFieldsHistory(): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(FIELDS_HISTORY_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const x of parsed) {
+      if (typeof x !== "string") continue;
+      const t = x.trim();
+      if (!t || seen.has(t)) continue;
+      seen.add(t);
+      out.push(t);
+      if (out.length >= MAX_FIELDS_HISTORY) break;
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
 export default function Home() {
   const [images, setImages] = useState<ImageItem[]>([]);
   const [fields, setFields] = useState("");
+  const [fieldsHistory, setFieldsHistory] = useState<string[]>([]);
   const [result, setResult] = useState("");
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState("");
@@ -19,6 +46,10 @@ export default function Home() {
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("/sw.js").catch(console.error);
     }
+  }, []);
+
+  useEffect(() => {
+    setFieldsHistory(readFieldsHistory());
   }, []);
 
   const compressImage = (dataUrl: string): Promise<{ base64: string; mimeType: string; preview: string }> => {
@@ -134,6 +165,21 @@ export default function Home() {
       if (!res.ok) throw new Error(data.error || "エラーが発生しました");
       setResult(data.result ?? "");
       setStatus("success");
+      const trimmedFields = fields.trim();
+      if (trimmedFields) {
+        setFieldsHistory((prev) => {
+          const next = [trimmedFields, ...prev.filter((x) => x !== trimmedFields)].slice(
+            0,
+            MAX_FIELDS_HISTORY
+          );
+          try {
+            localStorage.setItem(FIELDS_HISTORY_KEY, JSON.stringify(next));
+          } catch {
+            /* ignore quota */
+          }
+          return next;
+        });
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "エラーが発生しました");
       setStatus("error");
@@ -259,6 +305,21 @@ export default function Home() {
             placeholder="例：商品名、店舗名、金額"
             className="w-full rounded-xl bg-[#111111] border border-[#2a2a2a] text-white placeholder-[#555] px-4 py-3 text-sm focus:outline-none focus:border-orange-500/60 focus:bg-[#1a1a1a]"
           />
+          {fieldsHistory.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {fieldsHistory.map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  onClick={() => setFields(item)}
+                  className="max-w-full rounded-lg border border-[#2a2a2a] bg-[#1a1a1a] px-2.5 py-1.5 text-left text-xs text-[#ccc] transition-colors hover:border-orange-500/50 hover:bg-[#222] hover:text-white"
+                  title={item}
+                >
+                  <span className="line-clamp-2 break-all">{item}</span>
+                </button>
+              ))}
+            </div>
+          )}
           <p className="text-[#555] text-xs mt-1.5 ml-1">空欄にするとAIが自動判断します</p>
         </div>
 
