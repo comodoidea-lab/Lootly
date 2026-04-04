@@ -74,18 +74,36 @@ export default function Home() {
 
   const handlePaste = useCallback(
     (e: ClipboardEvent) => {
-      const imageItems = Array.from(e.clipboardData?.items ?? []).filter((i) =>
-        i.type.startsWith("image/")
-      );
-      const files = imageItems.map((i) => i.getAsFile()).filter(Boolean) as File[];
-      if (files.length) processFiles(files);
+      const dt = e.clipboardData;
+      if (!dt) return;
+
+      const files: File[] = [];
+
+      for (const item of Array.from(dt.items ?? [])) {
+        if (item.kind !== "file") continue;
+        const f = item.getAsFile();
+        if (f && f.type.startsWith("image/")) files.push(f);
+      }
+
+      if (files.length === 0 && dt.files?.length) {
+        for (const f of Array.from(dt.files)) {
+          if (f.type.startsWith("image/")) files.push(f);
+        }
+      }
+
+      if (files.length) {
+        e.preventDefault();
+        e.stopPropagation();
+        processFiles(files);
+      }
     },
     [processFiles]
   );
 
   useEffect(() => {
-    document.addEventListener("paste", handlePaste);
-    return () => document.removeEventListener("paste", handlePaste);
+    // capture: テキスト入力にフォーカスがあるときも、画像貼り付けを先に処理する
+    document.addEventListener("paste", handlePaste, true);
+    return () => document.removeEventListener("paste", handlePaste, true);
   }, [handlePaste]);
 
   const removeImage = (id: string) => {
